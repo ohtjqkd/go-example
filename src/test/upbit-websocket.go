@@ -3,6 +3,7 @@ package upbit_websocket
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"sync"
 	"time"
 
@@ -15,6 +16,12 @@ type Data struct{
 	OpeningPrice float32 `json:"opening_price"`
 	ClosePrice float32 `json:"high_price"`
 	AskBid string `json:"ask_bid"`
+}
+
+type Ticker struct {
+	Market string `json:"market"`
+	KoreanName string `json:"korean_name"`
+	EnglishName string `json:"english_name"`
 }
 
 func MakeWebsocket(orderSymbol string) error {
@@ -40,16 +47,24 @@ func GetTickerMessage(ws *upbit.WebsocketClient) {
 	}
 }
 
-func InitGetTickerMessage() {
-	tickers := []string{"KRW-BTC", "KRW-ADA"}
-	var wait sync.WaitGroup
+func InitGetTickerMessage(wait *sync.WaitGroup) {
+	var client upbit.Client
+	client.Client = http.DefaultClient
+	client.AccessKey = ""
+	client.SecretKey = ""
+	resp, _ := client.Get("https://api.upbit.com/v1/market/all")
+	fmt.Printf("resp: %v\n", resp)
+	p := []byte{}
+	n, _ := resp.Body.Read(p)
+	fmt.Printf("n: %v\n", n)
+	var tickers = []Ticker{}
+	json.Unmarshal(p, tickers)
 	wait.Add(len(tickers))
 	for _, tick := range tickers {
 		fmt.Println("before go routine")
 		go func(ticker string) {
 			defer wait.Done()
 			MakeWebsocket(ticker)
-		} (tick)
+		} (tick.Market)
 	}
-	wait.Wait()
 }
